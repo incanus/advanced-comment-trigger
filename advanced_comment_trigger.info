@@ -1,0 +1,5 @@
+name = Advanced comment trigger
+description = Provides a more advanced comment trigger than is provided by the core Trigger module.
+core = 6.x
+dependencies[] = comment
+dependencies[] = trigger

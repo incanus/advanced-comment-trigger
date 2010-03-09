@@ -1,0 +1,143 @@
+<?php
+
+/**
+ * Implementation of hook_menu().
+ */
+function advanced_comment_trigger_menu() {
+  return array(
+    'admin/settings/advanced_comment_trigger' => array(
+      'title' => 'Advanced Comment Trigger',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('_advanced_comment_trigger_settings'),
+      'access arguments' => array('administer actions'),
+      'type' => MENU_NORMAL_ITEM,
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_hook_info().
+ */
+function advanced_comment_trigger_hook_info() {
+  return array(
+    'advanced_comment_trigger' => array(
+      'advanced_comment_trigger' => array(
+        'comment_insert' => array(
+          'runs when' => t('After saving a new comment that meets !url', array('!url' => l('advanced trigger conditions', 'admin/settings/advanced_comment_trigger'))),
+        ),
+      ),
+    )
+  );
+}
+
+/**
+ * Implementation of hook_action_info().
+ */
+function advanced_comment_trigger_action_info() {
+  return array(
+    'comment_unpublish_action' => array(
+      'description' => t('Unpublish comment'),
+      'type' => 'comment',
+      'configurable' => FALSE,
+      'hooks' => array(
+        'advanced_comment_trigger' => array('comment_insert'),
+      ),
+    ),
+  );
+}
+
+/**
+ * Implementation of hook_menu_alter().
+ */
+function advanced_comment_trigger_menu_alter(&$items) {
+  $items['admin/build/trigger/advanced_comment_trigger']['weight'] = 10;
+}
+
+/**
+ * Implementation of hook_comment().
+ */
+function advanced_comment_trigger_comment(&$a1, $op) {
+  if ($op == 'insert') {
+    $comment_user = user_load($a1['uid']);
+    $comment_node = node_load($a1['nid']);
+
+    if (variable_get('advanced_comment_trigger_link_count', 0)) {
+      if (preg_match_all("/http:\/\//", $a1['subject'], $matches) + 
+          preg_match_all("/http:\/\//", $a1['comment'], $matches) >=
+          variable_get('advanced_comment_trigger_link_count', 0)) {
+        $link_trigger = TRUE;
+      }
+    }
+
+    if (count(array_filter(variable_get('advanced_comment_trigger_exempt_roles', array())))) {
+      foreach (array_filter(variable_get('advanced_comment_trigger_exempt_roles', array())) as $exempt_role_id) {
+        if (in_array($exempt_role_id, array_keys($comment_user->roles))) {
+          $role_exempt = TRUE;
+          break;
+        }
+      }
+    }
+
+    if (count(array_filter(variable_get('advanced_comment_trigger_exempt_content_types', array())))) {
+      foreach (array_filter(variable_get('advanced_comment_trigger_exempt_content_types', array())) as $exempt_node_type) {
+        if ($exempt_node_type == $comment_node->type) {
+          $content_type_exempt = TRUE;
+          break;
+        }
+      }
+    }
+
+    if ($link_trigger && ! $role_exempt && ! $content_type_exempt) {
+      $comment = (object)$a1;
+      module_invoke('advanced_comment_trigger', 'comment_insert', $comment);
+    }
+  }
+}
+
+/**
+ * Custom trigger definition.
+ */
+function advanced_comment_trigger_comment_insert($comment) {
+  $aids = _trigger_get_hook_aids('advanced_comment_trigger', 'comment_insert');
+
+  foreach (array_keys($aids) as $aid)
+    actions_do($aid, $comment);
+}
+
+/**
+ * Settings page callback.
+ */
+function _advanced_comment_trigger_settings() {
+  $form['advanced_comment_trigger_link_count'] = array(
+    '#type' => 'select',
+    '#title' => t('Number of hyperlinks in comment text'),
+    '#default_value' => variable_get('advanced_comment_trigger_link_count', 0),
+    '#options' => array(
+      0 => t('Allow an unlimited number of links'),
+      1 => t('Trigger on 1+ links'),
+      2 => t('Trigger on 2+ links'),
+      3 => t('Trigger on 3+ links'),
+      4 => t('Trigger on 4+ links'),
+      5 => t('Trigger on 5+ links'),
+    ),
+    '#description' => t('Comments with this many hyperlinks in them will satisfy this trigger.'),
+  );
+
+  $form['advanced_comment_trigger_exempt_roles'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Exempt roles'),
+    '#default_value' => variable_get('advanced_comment_trigger_exempt_roles', array()),
+    '#options' => user_roles(),
+    '#description' => t('Comments posted by these roles will not satisfy this trigger.'),
+  );
+
+  $form['advanced_comment_trigger_exempt_content_types'] = array(
+    '#type' => 'checkboxes',
+    '#title' => t('Exempt content types'),
+    '#default_value' => variable_get('advanced_comment_trigger_exempt_content_types', array()),
+    '#options' => node_get_types('names'),
+    '#description' => t('Comments posted to these content types will not satisfy this trigger.'),
+  );
+
+  return system_settings_form($form);
+}
