@@ -6,7 +6,7 @@
 function advanced_comment_trigger_menu() {
   return array(
     'admin/settings/advanced_comment_trigger' => array(
-      'title' => 'Advanced Comment Trigger',
+      'title' => 'Advanced comment trigger',
       'page callback' => 'drupal_get_form',
       'page arguments' => array('_advanced_comment_trigger_settings'),
       'access arguments' => array('administer actions'),
