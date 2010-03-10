@@ -52,6 +52,7 @@ function advanced_comment_trigger_action_info() {
  * Implementation of hook_menu_alter().
  */
 function advanced_comment_trigger_menu_alter(&$items) {
+  $items['admin/build/trigger/advanced_comment_trigger']['access arguments'] = array('administer actions');
   $items['admin/build/trigger/advanced_comment_trigger']['weight'] = 10;
 }
 
